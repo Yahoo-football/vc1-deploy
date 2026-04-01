@@ -204,35 +204,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const googleAuth = async (credential) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
-
-    try {
-      const response = await authService.googleAuth(credential);
-
-      if (response.success) {
-        const user = authService.getCurrentUser();
-        const permissions = authService.getPermissions();
-
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user, permissions }
-        });
-
-        return { success: true, data: response.data };
-      }
-
-      throw new Error(response.message || 'Google authentication failed');
-    } catch (error) {
-      const errorMessage = error.error || error.message || 'Google authentication failed';
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: errorMessage
-      });
-      return { success: false, error: errorMessage };
-    }
-  };
-
   // Logout function
   const logout = async () => {
     dispatch({ type: AUTH_ACTIONS.LOGOUT_START });
@@ -428,9 +399,8 @@ export const AuthProvider = ({ children }) => {
   const value = {
     ...state,
     login,
-      register,
-      googleAuth,
-      logout,
+    register,
+    logout,
     updateProfile,
     uploadAvatar,
     deleteAvatar,

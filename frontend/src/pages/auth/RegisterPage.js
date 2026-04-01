@@ -4,11 +4,10 @@ import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
 import { Badge, Button } from '../../components/ui';
 import AuthModalShell from '../../components/ui/AuthModalShell';
-import GoogleAuthButton from '../../components/auth/GoogleAuthButton';
 
 // Render the register page.
 const RegisterPage = () => {
-  const { register, googleAuth, loading, error } = useAuth();
+  const { register, loading, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -104,23 +103,6 @@ const RegisterPage = () => {
     }
   };
 
-  const handleGoogleSuccess = async (credential) => {
-    setClientError(null);
-    setValidationErrors({});
-
-    const result = await googleAuth(credential);
-    if (result.success) {
-      const role = result.data?.user?.role;
-      const defaultPath = role === 'field_owner' ? '/owner/dashboard' : '/app/dashboard';
-      navigate(defaultPath);
-      return;
-    }
-
-    if (result.error) {
-      setClientError(result.error);
-    }
-  };
-
   return (
     <AuthModalShell
       badgeLabel="New Account"
@@ -152,20 +134,6 @@ const RegisterPage = () => {
       )}
 
       <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-        <div className="space-y-3">
-          <GoogleAuthButton
-            disabled={loading}
-            onCredential={handleGoogleSuccess}
-            onError={(message) => setClientError(message || 'Google sign-up failed.')}
-            text="signup_with"
-          />
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-400">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span>or</span>
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="firstName" className="mb-2 block text-sm font-semibold text-slate-700">

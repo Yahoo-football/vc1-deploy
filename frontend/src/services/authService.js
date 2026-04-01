@@ -26,21 +26,6 @@ const authService = {
     return response;
   },
 
-  getGoogleAuthConfig: async () => {
-    return apiService.get('/auth/google/config');
-  },
-
-  googleAuth: async (credential) => {
-    const response = await apiService.post('/auth/google', { credential });
-
-    if (response.success && response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-
-    return response;
-  },
-
   // Forgot password: request OTP
   requestPasswordOtp: async (identifier) => {
     return apiService.post('/auth/forgot-password', { identifier });

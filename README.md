@@ -213,6 +213,69 @@ Frontend URL:
 
 The frontend defaults to `/api` and uses the local proxy in development, so a frontend `.env` file is optional unless you want to override `REACT_APP_API_URL`.
 
+## Deployment
+
+### Single Domain Production
+
+If you deploy frontend and backend on the same server with Apache or Nginx, use one domain:
+
+- Frontend: `https://roeurn.rest`
+- Backend API: `https://roeurn.rest/api`
+- Backend app process: `http://127.0.0.1:5000`
+
+Set these frontend environment variables:
+
+```env
+REACT_APP_API_URL=/api
+REACT_APP_APP_URL=https://roeurn.rest
+```
+
+Notes:
+- The frontend calls `/api`, so the browser stays on the same domain.
+- Your reverse proxy should send `/api` and `/uploads` to the backend on port `5000`.
+- All other routes should serve the React build so React Router works on refresh.
+
+### Backend Environment
+
+Create `backend/.env` from `backend/.env.example` and set production values like:
+
+```env
+NODE_ENV=production
+PORT=5000
+JWT_SECRET=replace_with_a_long_random_secret_at_least_32_characters
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=football_booking
+DB_USER=football_app
+DB_PASSWORD=replace_with_database_password
+DB_SSL=false
+CORS_ORIGIN=https://roeurn.rest,https://www.roeurn.rest,http://localhost:3000,http://127.0.0.1:3000
+CORS_VERCEL_PREVIEW_SUFFIXES=.vercel.app
+DB_SYNC_IN_PRODUCTION=false
+HTTP_LOGGING=true
+RATE_LIMITING=true
+```
+
+Notes:
+- The backend now allows your production frontend domain and localhost for development.
+- Production schema sync is disabled by default for safety. Turn on `DB_SYNC_IN_PRODUCTION=true` only if you explicitly want Sequelize to sync tables on boot.
+- If you later move MySQL to RDS, change `DB_HOST` and set `DB_SSL=true` if required.
+
+### Domain Pairing
+
+- Frontend: `https://roeurn.rest`
+- Backend API: `https://roeurn.rest/api`
+- Health check: `https://roeurn.rest/health`
+
+### Important Deploy Checklist
+
+- Add valid DNS records for `roeurn.rest` and optionally `www.roeurn.rest`.
+- Install SSL certificates for your domain.
+- Open your AWS security group for HTTP/HTTPS and database access only from trusted sources.
+- Store backend secrets in AWS environment variables, not in git.
+- Make sure uploads are persisted outside ephemeral instances if your AWS host can be replaced.
+- Test login, image upload, protected routes, and page refresh after deploy.
+
 ## Available Scripts
 
 ### Backend

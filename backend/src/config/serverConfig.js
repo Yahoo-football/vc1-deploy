@@ -44,6 +44,45 @@ const configuredAllowedExtensions = process.env.ALLOWED_FILE_EXTENSIONS
   ? process.env.ALLOWED_FILE_EXTENSIONS.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
   : defaultAllowedExtensions;
 
+const splitCsv = (value = '') =>
+  String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const normalizeOrigin = (value = '') => String(value).trim().replace(/\/+$/, '');
+
+const defaultCorsOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'https://roeurn.rest',
+  'https://www.roeurn.rest'
+];
+
+const configuredCorsOrigins = process.env.CORS_ORIGIN
+  ? splitCsv(process.env.CORS_ORIGIN).map(normalizeOrigin)
+  : defaultCorsOrigins;
+
+const vercelPreviewSuffixes = splitCsv(process.env.CORS_VERCEL_PREVIEW_SUFFIXES || '.vercel.app');
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (configuredCorsOrigins.includes(normalizedOrigin)) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(normalizedOrigin);
+    return vercelPreviewSuffixes.some((suffix) => parsed.hostname.endsWith(suffix));
+  } catch (_error) {
+    return false;
+  }
+};
+
 // Check whether allowed image upload is true.
 const isAllowedImageUpload = (file = {}) => {
   const mimeType = String(file.mimetype || '').toLowerCase();
@@ -102,12 +141,17 @@ const serverConfig = {
 
   // CORS configuration
   cors: {
-    origin: process.env.CORS_ORIGIN 
-      ? process.env.CORS_ORIGIN.split(',') 
-      : ['http://localhost:3000', 'http://localhost:3001'],
+    origin(origin, callback) {
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin not allowed by CORS: ${origin || 'unknown'}`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-Id'],
+    exposedHeaders: ['X-Request-Id']
   },
 
   // Security configuration

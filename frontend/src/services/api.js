@@ -5,7 +5,10 @@ import axios from 'axios';
 // =====================================
 // API base URL - can be overridden by environment variable.
 // Default to same-origin /api so the current frontend talks to the current backend.
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const rawApiBaseUrl = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = rawApiBaseUrl.endsWith('/') && rawApiBaseUrl !== '/'
+  ? rawApiBaseUrl.replace(/\/+$/, '')
+  : rawApiBaseUrl;
 
 // Create axios instance
 const api = axios.create({

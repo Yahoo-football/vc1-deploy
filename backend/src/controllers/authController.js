@@ -28,7 +28,6 @@ const { createInAppNotification } = require('../utils/notify');
 const { sendEmail } = require('../utils/emailService');
 const { getUploadDir, resolveManagedUploadPath } = require('../utils/storagePaths');
 const crypto = require('crypto');
-const axios = require('axios');
 
 const DEFAULT_AVATAR_PATH = '/uploads/profile/default_profile.jpg';
 const LEGACY_DEFAULT_AVATAR_PATH = '/uploads/profile/defualt_profile.jpg';
@@ -53,62 +52,6 @@ const resetTokenStore = new Map();
 const normalizeIdentifier = (value = '') => String(value).trim().toLowerCase();
 
 const generateOtpCode = () => Math.floor(100000 + Math.random() * 900000).toString();
-
-const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
-const getGoogleClientId = () =>
-  String(process.env.GOOGLE_CLIENT_ID || process.env.REACT_APP_GOOGLE_CLIENT_ID || '').trim();
-
-const sanitizeUsernamePart = (value = '') =>
-  String(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 20);
-
-const buildUniqueGoogleUsername = async ({ email, firstName, lastName }) => {
-  const emailPrefix = sanitizeUsernamePart(String(email || '').split('@')[0]);
-  const firstPart = sanitizeUsernamePart(firstName);
-  const lastPart = sanitizeUsernamePart(lastName);
-  const base =
-    [firstPart, lastPart].filter(Boolean).join('') ||
-    emailPrefix ||
-    `player${Date.now()}`;
-
-  let candidate = base.slice(0, 30) || `player${Date.now()}`;
-  let suffix = 0;
-
-  while (true) {
-    const existing = await User.findOne({ where: { username: candidate } });
-    if (!existing) return candidate;
-    suffix += 1;
-    const suffixText = String(suffix);
-    const trimmedBase = base.slice(0, Math.max(3, 30 - suffixText.length));
-    candidate = `${trimmedBase}${suffixText}`;
-  }
-};
-
-const verifyGoogleIdToken = async (idToken) => {
-  const response = await axios.get(GOOGLE_TOKENINFO_URL, {
-    params: { id_token: idToken },
-    timeout: 10000
-  });
-
-  const payload = response.data || {};
-  const expectedAudience = getGoogleClientId();
-
-  if (!expectedAudience) {
-    throw new Error('Google sign-in is not configured on the server.');
-  }
-
-  if (expectedAudience && payload.aud !== expectedAudience) {
-    throw new Error('Google token audience mismatch.');
-  }
-
-  if (payload.email_verified !== 'true' && payload.email_verified !== true) {
-    throw new Error('Google email is not verified.');
-  }
-
-  return payload;
-};
 
 const findUserByIdentifier = async (identifier) => {
   if (!identifier) return null;
@@ -325,107 +268,6 @@ const login = async (req, res) => {
   }
 };
 
-const getGoogleAuthConfig = async (req, res) => {
-  const clientId = getGoogleClientId();
-
-  return res.json({
-    enabled: Boolean(clientId),
-    clientId: clientId || null
-  });
-};
-
-const googleAuth = async (req, res) => {
-  try {
-    const { credential } = req.body || {};
-
-    if (!credential) {
-      return res.status(400).json({ error: 'Google credential is required.' });
-    }
-
-    const googleProfile = await verifyGoogleIdToken(credential);
-    const email = normalizeIdentifier(googleProfile.email);
-
-    if (!email) {
-      return res.status(400).json({ error: 'Google account email is missing.' });
-    }
-
-    let user = await User.findOne({ where: { email } });
-
-    if (user) {
-      if (user.status !== 'active') {
-        return res.status(400).json({ error: 'Account is not active. Please contact support.' });
-      }
-
-      const updatePayload = {
-        lastLogin: new Date(),
-        emailVerified: true
-      };
-
-      if (!user.avatarUrl && googleProfile.picture) {
-        updatePayload.avatarUrl = googleProfile.picture;
-      }
-
-      await user.update(updatePayload);
-    } else {
-      const firstName = String(googleProfile.given_name || googleProfile.name || 'Google').trim();
-      const lastName = String(googleProfile.family_name || 'User').trim();
-      const username = await buildUniqueGoogleUsername({
-        email,
-        firstName,
-        lastName
-      });
-      const randomPassword = crypto.randomBytes(24).toString('hex');
-      const hashedPassword = await bcrypt.hash(randomPassword, 12);
-
-      user = await User.create({
-        username,
-        email,
-        password: hashedPassword,
-        firstName: firstName || 'Google',
-        lastName: lastName || 'User',
-        role: 'player',
-        status: 'active',
-        emailVerified: true,
-        avatarUrl: googleProfile.picture || null,
-        lastLogin: new Date()
-      });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    const userResponse = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      phone: user.phone,
-      address: user.address,
-      dateOfBirth: user.dateOfBirth,
-      gender: user.gender,
-      avatarUrl: user.avatarUrl,
-      status: user.status,
-      emailVerified: user.emailVerified,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt
-    };
-
-    return res.json({ user: userResponse, token });
-  } catch (error) {
-    console.error('Google auth error:', error?.response?.data || error);
-    return res.status(500).json({
-      error:
-        error?.response?.status === 400
-          ? 'Invalid Google sign-in token.'
-          : error.message || 'Internal server error during Google authentication.'
-    });
-  }
-};
 const getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, { 
@@ -1370,7 +1212,6 @@ const reviewRoleRequest = async (req, res) => {
 module.exports = {
   register,
   login,
-  getGoogleAuthConfig,
   getProfile,
   getProfileStats,
   updateProfile,
@@ -1385,7 +1226,6 @@ module.exports = {
   cancelRoleRequest,
   getAllRoleRequestsForAdmin,
   reviewRoleRequest,
-  googleAuth,
   uploadProfileAvatar,
   deleteProfileAvatar
 };

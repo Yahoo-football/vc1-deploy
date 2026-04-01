@@ -12,6 +12,7 @@ const { applyLegacySchemaFixes } = require('./src/utils/legacySchemaFix');
 const { getPublicRoot, getPublicAssetPath, getUploadRoot } = require('./src/utils/storagePaths');
 const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 const { generalLimiter, authLimiter, searchLimiter, createLimiter } = require('./src/middleware/rateLimiter');
+const { attachRequestId, sanitizeRequestPayload } = require('./src/middleware/securityEnhancements');
 
 // Import routes
 const authRoutes = require('./src/routes/authRoutes');
@@ -211,6 +212,8 @@ app.set('trust proxy', 1);
 app.use(helmet(serverConfig.security.helmet));
 app.use(cors(serverConfig.cors));
 app.use(compression());
+app.use(attachRequestId);
+app.use(sanitizeRequestPayload);
 
 // Rate limiting
 if (serverConfig.security.rateLimiting.enabled) {
@@ -515,13 +518,18 @@ const startServer = async () => {
         console.warn('Continuing to start server despite test DB sync failure.');
       }
     } else {
-      console.log('Production mode: Synchronizing database safely...');
-      try {
-        await sequelize.sync();
-        console.log('Database synchronized safely.');
-      } catch (syncErr) {
-        console.warn('Production DB sync failed:', syncErr.message);
-        console.warn('Continuing to start server despite sync failure.');
+      const enableProductionSync = process.env.DB_SYNC_IN_PRODUCTION === 'true';
+      if (enableProductionSync) {
+        console.log('Production mode: DB_SYNC_IN_PRODUCTION=true, running safe synchronization...');
+        try {
+          await sequelize.sync();
+          console.log('Database synchronized safely.');
+        } catch (syncErr) {
+          console.warn('Production DB sync failed:', syncErr.message);
+          console.warn('Continuing to start server despite sync failure.');
+        }
+      } else {
+        console.log('Production mode: Skipping sequelize.sync() for safer deployments.');
       }
     }
     try {

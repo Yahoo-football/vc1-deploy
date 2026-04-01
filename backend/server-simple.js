@@ -438,25 +438,6 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-const sendGoogleAuthConfig = (req, res) => {
-  res.json({
-    enabled: false,
-    clientId: null
-  });
-};
-
-const handleGoogleAuthUnavailable = (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: 'Google sign-in is only available when running the full backend server.'
-  });
-};
-
-app.get('/api/auth/google/config', sendGoogleAuthConfig);
-app.post('/api/auth/google', handleGoogleAuthUnavailable);
-app.get('/auth/google/config', sendGoogleAuthConfig);
-app.post('/auth/google', handleGoogleAuthUnavailable);
-
 // Alias routes without /api for compatibility
 app.post('/auth/forgot-password', handleForgotPassword);
 app.post('/auth/forgot-password/verify', handleVerifyOtp);
